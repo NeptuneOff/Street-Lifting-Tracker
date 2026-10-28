@@ -70,11 +70,11 @@ const exercise = (
     block('Volume', 3, 8, Math.round((peak * 0.65) / 2.5) * 2.5, 240),
   ],
 });
-export function seedRecords(): DataRecord[] {
+export function seedRecords(options?: { name: string; blank: boolean }): DataRecord[] {
   const profile: Profile = {
     id: 'profile',
-    name: 'Karl',
-    bodyweight: 76.5,
+    name: options?.name || 'Athlète',
+    bodyweight: options?.blank ? 75 : 76.5,
     category: 80,
     increment: 2.5,
     autoRest: true,
@@ -126,9 +126,20 @@ export function seedRecords(): DataRecord[] {
       skills: 'Planche — au ressenti',
     },
   ];
+  const definitions = referenceExercises.map((e) =>
+    options?.blank ? { ...e, reference: 0, reliability: 'Estimation' as const } : { ...e },
+  );
+  if (options?.blank)
+    for (const program of programs)
+      for (const planned of program.exercises) {
+        planned.blocks = planned.blocks.map((b) => ({
+          ...b,
+          load: planned.exerciseId === 'squat' ? 20 : 0,
+        }));
+      }
   return [
     { kind: 'profile' as const, payload: profile },
-    ...referenceExercises.map((payload) => ({ kind: 'exercise' as const, payload })),
+    ...definitions.map((payload) => ({ kind: 'exercise' as const, payload })),
     ...programs.map((payload) => ({ kind: 'program' as const, payload })),
   ].map(({ kind, payload }) => ({
     id: payload.id,

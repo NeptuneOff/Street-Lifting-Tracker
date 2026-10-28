@@ -1,5 +1,13 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { getState, flush, replaceRecords } from './store';
+import {
+  getState,
+  flush,
+  replaceRecords,
+  getWorkspaceKey,
+  getWorkspaceIdentity,
+  assertWorkspace,
+  workspaceStorageKey,
+} from './store';
 import { validatePayload } from './backup';
 import { uid } from './seed';
 import type { Conflict, DataRecord, RemoteRecord } from './types';
@@ -46,6 +54,10 @@ export function validateConfig(config: CloudConfig) {
     }
   }
 }
+export const authStorageKey = (url: string) =>
+  `streetlift-auth:${encodeURIComponent(new URL(url).origin)}`;
+export const legacyAuthStorageKey = (url: string) =>
+  `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;
 export function getCloudClient() {
   const config = getCloudConfig();
   if (!config.url || !config.key) return null;
@@ -53,8 +65,13 @@ export function getCloudClient() {
   const key = config.url + config.key;
   if (key !== clientKey) {
     client?.auth.stopAutoRefresh();
+    const storageKey = authStorageKey(config.url);
+    const legacyKey = legacyAuthStorageKey(config.url);
+    const legacy = localStorage.getItem(legacyKey);
+    if (!localStorage.getItem(storageKey) && legacy) localStorage.setItem(storageKey, legacy);
+    if (legacy) localStorage.removeItem(legacyKey);
     client = createClient(config.url, config.key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey },
       global: {
         fetch: (input, init) =>
           fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(15000) }),
@@ -89,39 +106,52 @@ export function reconcile(
   if (local.baseVersion === remote.version) return 'upload';
   return 'conflict';
 }
-let syncing = false;
+const syncing = new Set<string>();
 export async function synchronize(): Promise<{
   conflicts: Conflict[];
   count: number;
   signedOut?: boolean;
 }> {
-  if (syncing) return { conflicts: [], count: 0 };
+  const scope = getWorkspaceKey();
+  if (!scope || !getState().ready) return { conflicts: [], count: 0, signedOut: true };
+  if (syncing.has(scope)) return { conflicts: [], count: 0 };
   const cloud = getCloudClient();
   if (!cloud) throw new Error('Configure Supabase pour synchroniser.');
-  syncing = true;
+  syncing.add(scope);
   try {
     await flush();
+    assertWorkspace(scope);
     const {
       data: { session },
       error,
     } = await cloud.auth.getSession();
     if (error) throw error;
     if (!session) return { conflicts: [], count: 0, signedOut: true };
-    const account = `${getCloudConfig().url}:${session.user.id}`;
-    const previous = localStorage.getItem('streetlift-bound-account');
-    if (previous && previous !== account)
-      throw new Error(
-        'Ce carnet est associé à un autre compte ou projet. Utilise un autre profil de navigateur pour éviter de mélanger tes données.',
-      );
-    localStorage.setItem('streetlift-bound-account', account);
+    assertWorkspace(scope);
+    const identity = getWorkspaceIdentity();
+    if (
+      identity?.userId !== session.user.id ||
+      new URL(getCloudConfig().url).origin !== identity.project
+    )
+      throw new Error('Le compte connecté ne correspond pas au carnet actif.');
+    // Pin the JWT for the entire operation: switching accounts cannot send A's data as B.
+    const config = getCloudConfig();
+    const scopedCloud = createClient(config.url, config.key, {
+      accessToken: async () => session.access_token,
+      global: {
+        fetch: (input, init) =>
+          fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(15000) }),
+      },
+    });
     const remotes: RemoteRecord[] = [];
     for (let offset = 0; ; offset += 500) {
-      const { data, error: readError } = await cloud
+      const { data, error: readError } = await scopedCloud
         .from('training_records')
         .select('id,kind,payload,version,deleted,updated_at')
         .eq('user_id', session.user.id)
         .order('id')
         .range(offset, offset + 499);
+      assertWorkspace(scope);
       if (readError) throw readError;
       remotes.push(...(data as RemoteRecord[]));
       if (data.length < 500) break;
@@ -136,13 +166,13 @@ export async function synchronize(): Promise<{
         (action === 'remote' || action === 'ack') &&
         (!local || local.version !== remote.version || local.dirty)
       )
-        replaceRecords([fromRemote(remote)]);
+        replaceRecords([fromRemote(remote)], scope);
       if (action === 'conflict') conflicts.push({ id: remote.id, local: local!, remote });
     }
     const conflictIds = new Set(conflicts.map((c) => c.id));
     let count = 0;
     for (const record of getState().records.filter((r) => r.dirty && !conflictIds.has(r.id))) {
-      const { data, error: writeError } = await cloud.rpc('push_training_record', {
+      const { data, error: writeError } = await scopedCloud.rpc('push_training_record', {
         p_id: record.id,
         p_kind: record.kind,
         p_payload: record.payload,
@@ -150,6 +180,7 @@ export async function synchronize(): Promise<{
         p_base_version: record.baseVersion,
         p_version: record.version,
       });
+      assertWorkspace(scope);
       if (writeError) throw writeError;
       const response = data as { accepted: boolean; record: RemoteRecord };
       if (!response.accepted) {
@@ -161,21 +192,26 @@ export async function synchronize(): Promise<{
         continue;
       }
       const current = getState().records.find((r) => r.id === record.id)!;
-      replaceRecords([
-        current.version === record.version
-          ? { ...current, baseVersion: record.version, dirty: false }
-          : { ...current, baseVersion: record.version },
-      ]);
+      replaceRecords(
+        [
+          current.version === record.version
+            ? { ...current, baseVersion: record.version, dirty: false }
+            : { ...current, baseVersion: record.version },
+        ],
+        scope,
+      );
       count++;
     }
     await flush();
-    localStorage.setItem('streetlift-last-sync', new Date().toISOString());
+    assertWorkspace(scope);
+    localStorage.setItem(workspaceStorageKey('last-sync'), new Date().toISOString());
     return { conflicts, count };
   } finally {
-    syncing = false;
+    syncing.delete(scope);
   }
 }
-export function resolveConflict(conflict: Conflict, choice: 'local' | 'remote') {
+export function resolveConflict(conflict: Conflict, choice: 'local' | 'remote', scope: string) {
+  assertWorkspace(scope);
   const current = getState().records.find((r) => r.id === conflict.id) ?? conflict.local;
   replaceRecords([
     choice === 'remote'

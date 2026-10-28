@@ -2891,3 +2891,89 @@ textarea::placeholder {
     scroll-behavior: auto !important;
   }
 }
+
+.account-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 35px 18px;
+  background: radial-gradient(ellipse at 50% 0, #26361c55, transparent 65%);
+}
+.account-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  font-size: 23px;
+  margin-bottom: 30px;
+}
+.account-brand > svg {
+  color: var(--lime);
+}
+.account-card {
+  width: min(100%, 440px);
+  padding: 32px;
+}
+.account-card h1 {
+  font-size: 34px;
+  margin: 15px 0 18px;
+}
+.account-lock {
+  width: 48px;
+  height: 48px;
+  background: #2c3e21;
+  color: var(--lime);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  margin-bottom: 23px;
+}
+.account-card .segmented {
+  margin: 24px 0;
+}
+.account-card .segmented button {
+  flex: 1;
+}
+.magic-link {
+  margin-top: 12px;
+}
+.account-message {
+  margin: 20px 0 0;
+  line-height: 1.7;
+  font-size: 12px;
+  color: #c7dfb0;
+  overflow-wrap: anywhere;
+}
+.account-privacy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 25px;
+  padding-top: 20px;
+  font-size: 10px;
+  color: #9db48a;
+}
+.account-setup summary {
+  font-size: 12px;
+  color: #a9c98d;
+  cursor: pointer;
+}
+.account-setup p {
+  margin-top: 17px;
+}
+@media (max-width: 600px) {
+  .account-card {
+    padding: 26px 21px;
+  }
+  .account-card h1 {
+    font-size: 31px;
+  }
+  .account-card input {
+    font-size: 16px;
+  }
+}

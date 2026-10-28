@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { Conflict } from './types';
 import { getCloudClient, synchronize } from './sync';
+import { getWorkspaceKey } from './store';
 let status = { busy: false, message: '', conflicts: [] as Conflict[] };
 const listeners = new Set<() => void>();
 const update = (patch: Partial<typeof status>) => {
@@ -16,12 +17,16 @@ export function useCloudStatus() {
     () => status,
   );
 }
+export const resetCloudStatus = () => update({ busy: false, message: '', conflicts: [] });
 export async function runSync() {
+  const scope = getWorkspaceKey();
+  if (!scope) return;
   if (status.busy || !navigator.onLine) return;
   try {
     if (!getCloudClient()) return;
     update({ busy: true, message: 'Synchronisation en cours…' });
     const result = await synchronize();
+    if (getWorkspaceKey() !== scope) return;
     update({
       conflicts: result.conflicts,
       message: result.signedOut
@@ -31,10 +36,11 @@ export async function runSync() {
           : 'Données synchronisées.',
     });
   } catch (error) {
+    if (getWorkspaceKey() !== scope) return;
     update({
       message: `Synchronisation interrompue : ${error instanceof Error ? error.message : String(error)}. Tes données locales sont conservées.`,
     });
   } finally {
-    update({ busy: false });
+    if (getWorkspaceKey() === scope) update({ busy: false });
   }
 }

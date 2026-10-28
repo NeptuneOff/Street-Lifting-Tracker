@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { Component, type ReactNode } from 'react';
 import { App } from './App';
+import { AccountGate } from './components/AccountGate';
 import { backupJSON, downloadFile } from './lib/backup';
 import { getState } from './lib/store';
 import './styles.css';
@@ -32,7 +33,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
 }
 createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>,
+  <AccountGate>
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  </AccountGate>,
 );

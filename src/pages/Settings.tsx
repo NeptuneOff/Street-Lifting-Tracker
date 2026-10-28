@@ -20,7 +20,9 @@ import {
   parseProgramCSV,
   validatePayload,
 } from '../lib/backup';
-import { getCloudClient, getCloudConfig, resolveConflict, validateConfig } from '../lib/sync';
+import { resolveConflict } from '../lib/sync';
+import { useAccount } from '../components/AccountGate';
+import { getWorkspaceKey, workspaceStorageKey, assertWorkspace } from '../lib/store';
 import { runSync, useCloudStatus } from '../lib/cloud-status';
 import { localDate, number } from '../lib/training';
 import type { Exercise, Profile } from '../lib/types';
@@ -334,8 +336,10 @@ function BackupSettings() {
   const jsonInput = useRef<HTMLInputElement>(null),
     csvInput = useRef<HTMLInputElement>(null);
   const importJSON = async (file: File) => {
+    const scope = getWorkspaceKey()!;
     try {
       const imported = parseBackup(await file.text());
+      assertWorkspace(scope);
       const current = getState().records;
       const overlaps = imported.filter((r) => current.some((c) => c.id === r.id)).length;
       if (
@@ -352,9 +356,11 @@ function BackupSettings() {
         })),
       );
       await flush();
+      assertWorkspace(scope);
       toast('Sauvegarde importée.');
       window.dispatchEvent(new Event('streetlift-imported'));
     } catch (error) {
+      if (getWorkspaceKey() !== scope) return;
       toast(`Import refusé : ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -444,13 +450,17 @@ function BackupSettings() {
           const f = e.target.files?.[0];
           e.target.value = '';
           if (!f) return;
+          const scope = getWorkspaceKey()!;
           try {
             const programs = parseProgramCSV(await f.text(), new Set(exercises.map((e) => e.id)));
+            assertWorkspace(scope);
             if (!window.confirm(`Ajouter ${programs.length} séance(s) au programme ?`)) return;
             programs.forEach((p) => putPayload('program', p));
             await flush();
+            assertWorkspace(scope);
             toast('Programme CSV importé.');
           } catch (error) {
+            if (getWorkspaceKey() !== scope) return;
             toast(String(error));
           }
         }}
@@ -462,157 +472,45 @@ function CloudSettings() {
   const { records } = useData();
   const { toast } = useApp();
   const status = useCloudStatus();
-  const [config, setConfig] = useState(getCloudConfig),
-    [email, setEmail] = useState(''),
-    [userEmail, setUserEmail] = useState(''),
-    [authBusy, setAuthBusy] = useState(false);
-  useEffect(() => {
-    let cleanup = () => {};
-    try {
-      const cloud = getCloudClient();
-      if (cloud) {
-        void cloud.auth
-          .getSession()
-          .then(({ data }) => setUserEmail(data.session?.user.email ?? ''));
-        const { data } = cloud.auth.onAuthStateChange((_event, session) =>
-          setUserEmail(session?.user.email ?? ''),
-        );
-        cleanup = () => data.subscription.unsubscribe();
-      }
-    } catch {
-      /* Show invalid configuration on submit. */
-    }
-    return cleanup;
-  }, [config.url, config.key]);
+  const { identity, signOut } = useAccount();
+  const scope = getWorkspaceKey()!;
   return (
     <section className="card settings-card">
       <div className="section-head">
         <h2>
           <Cloud size={21} /> Synchronisation
         </h2>
-        <span className="tag">OPTIONNELLE</span>
+        <span className="tag">COMPTE PRIVÉ</span>
       </div>
       <p className="muted small">
-        Le carnet fonctionne intégralement sans compte. Configure ton projet Supabase pour retrouver
-        tes données sur PC et téléphone.
+        Ton programme, ton historique et tes pesées appartiennent uniquement à ton compte.
       </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          try {
-            validateConfig(config);
-            localStorage.setItem('streetlift-cloud', JSON.stringify(config));
-            getCloudClient();
-            window.dispatchEvent(new Event('streetlift-cloud-config'));
-            toast('Configuration enregistrée. Connecte-toi pour synchroniser.');
-          } catch (error) {
-            toast(String(error));
-          }
-        }}
+      <div className="signed-in">
+        <ShieldCheck size={18} />
+        <span>{identity.email}</span>
+        <IconButton label="Se déconnecter" onClick={() => void signOut()}>
+          <LogOut size={17} />
+        </IconButton>
+      </div>
+      <Button
+        className="primary"
+        disabled={status.busy || !navigator.onLine}
+        onClick={() => void runSync()}
       >
-        <label className="field">
-          <span>URL du projet Supabase</span>
-          <input
-            type="url"
-            placeholder="https://ton-projet.supabase.co"
-            required
-            value={config.url}
-            onChange={(e) => setConfig({ ...config, url: e.target.value.trim() })}
-          />
-        </label>
-        <label className="field">
-          <span>Clé publique publishable ou anon</span>
-          <input
-            type="password"
-            autoComplete="off"
-            placeholder="sb_publishable_…"
-            required
-            value={config.key}
-            onChange={(e) => setConfig({ ...config, key: e.target.value.trim() })}
-          />
-        </label>
-        <Button className="secondary" type="submit">
-          <Save size={16} />
-          Enregistrer Supabase
-        </Button>
-      </form>
-      {getCloudConfig().url && (
-        <div className="auth-panel">
-          {userEmail ? (
-            <>
-              <div className="signed-in">
-                <ShieldCheck size={18} />
-                <span>{userEmail}</span>
-                <IconButton
-                  label="Se déconnecter"
-                  onClick={async () => {
-                    await getCloudClient()?.auth.signOut({ scope: 'local' });
-                    setUserEmail('');
-                    toast('Déconnecté. Données locales conservées.');
-                  }}
-                >
-                  <LogOut size={17} />
-                </IconButton>
-              </div>
-              <Button
-                className="primary"
-                disabled={status.busy || !navigator.onLine}
-                onClick={() => void runSync()}
-              >
-                <RefreshCw size={16} className={status.busy ? 'spin' : ''} />
-                {status.busy ? 'Synchronisation…' : 'Synchroniser maintenant'}
-              </Button>
-            </>
-          ) : (
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthBusy(true);
-                try {
-                  const cloud = getCloudClient();
-                  if (!cloud) throw new Error('Enregistre la configuration Supabase.');
-                  const { error } = await cloud.auth.signInWithOtp({
-                    email,
-                    options: {
-                      emailRedirectTo: new URL(import.meta.env.BASE_URL, location.origin).href,
-                    },
-                  });
-                  if (error) throw error;
-                  toast('Lien de connexion envoyé. Ouvre-le sur cet appareil.');
-                } catch (error) {
-                  toast(String(error));
-                } finally {
-                  setAuthBusy(false);
-                }
-              }}
-            >
-              <label className="field">
-                <span>Adresse e-mail</span>
-                <input
-                  type="email"
-                  required
-                  autoComplete="email"
-                  placeholder="toi@exemple.fr"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
-              <Button className="primary" disabled={authBusy}>
-                Recevoir mon lien de connexion
-              </Button>
-            </form>
+        <RefreshCw size={16} className={status.busy ? 'spin' : ''} />
+        {status.busy ? 'Synchronisation…' : 'Synchroniser maintenant'}
+      </Button>
+      <p className="small muted" role="status">
+        {status.message ||
+          `${records.filter((r) => r.dirty).length} élément(s) en attente de synchronisation.`}
+      </p>
+      {localStorage.getItem(workspaceStorageKey('last-sync')) && (
+        <p className="small muted">
+          Dernier échange :{' '}
+          {new Date(localStorage.getItem(workspaceStorageKey('last-sync'))!).toLocaleString(
+            'fr-FR',
           )}
-          <p className="small muted" role="status">
-            {status.message ||
-              `${records.filter((r) => r.dirty).length} élément(s) en attente de synchronisation.`}
-          </p>
-          {localStorage.getItem('streetlift-last-sync') && (
-            <p className="small muted">
-              Dernier échange :{' '}
-              {new Date(localStorage.getItem('streetlift-last-sync')!).toLocaleString('fr-FR')}
-            </p>
-          )}
-        </div>
+        </p>
       )}
       {status.conflicts.length > 0 && (
         <div className="conflicts">
@@ -652,7 +550,7 @@ function CloudSettings() {
                   className="secondary"
                   onClick={() => {
                     if (window.confirm('Conserver la version de cet appareil pour cet élément ?')) {
-                      resolveConflict(c, 'local');
+                      resolveConflict(c, 'local', scope);
                       void runSync();
                     }
                   }}
@@ -663,7 +561,7 @@ function CloudSettings() {
                   className="secondary"
                   onClick={() => {
                     if (window.confirm('Remplacer cet élément par la version distante ?')) {
-                      resolveConflict(c, 'remote');
+                      resolveConflict(c, 'remote', scope);
                       void runSync();
                     }
                   }}
@@ -676,9 +574,8 @@ function CloudSettings() {
         </div>
       )}
       <p className="footnote">
-        Exécute d’abord la migration SQL du dépôt et autorise l’URL de ce site dans Supabase Auth.
-        Une clé privée ou service_role est refusée. Le compte reste lié à ce carnet pour éviter de
-        mélanger les données.
+        Après déconnexion, le carnet est masqué. Un autre compte ouvre son propre espace, y compris
+        sur le même navigateur.
       </p>
     </section>
   );

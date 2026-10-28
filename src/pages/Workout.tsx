@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { ArrowRight, Check, ChevronDown, ChevronUp, Clock3, Flag, Plus, Minus } from 'lucide-react';
-import { flush, putPayload, removeRecord, useData } from '../lib/store';
+import {
+  flush,
+  putPayload,
+  removeRecord,
+  useData,
+  getWorkspaceKey,
+  assertWorkspace,
+} from '../lib/store';
 import { DAYS, type SessionExercise, type TrainingSession } from '../lib/types';
 import {
   loadLabel,
@@ -257,13 +264,17 @@ export function Workout() {
     )
       return;
     setFinishing(true);
+    const scope = getWorkspaceKey()!;
     try {
       await flush();
+      assertWorkspace(scope);
       update({ ...active, status: 'completed', endedAt: new Date().toISOString() });
       await flush();
+      assertWorkspace(scope);
       toast('Séance enregistrée. Le travail est fait.');
       navigate('progress');
     } catch {
+      if (getWorkspaceKey() !== scope) return;
       toast('Enregistrement impossible. Exporte les données depuis les paramètres.');
     } finally {
       setFinishing(false);

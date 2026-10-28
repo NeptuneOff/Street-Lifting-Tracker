@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 async function nav(page: Page, name: RegExp) {
   await page.locator('nav:visible').getByRole('button', { name }).click();
@@ -7,6 +8,9 @@ async function startThursday(page: Page) {
   await page.goto('./');
   await expect(page.getByRole('heading', { name: /Salut Karl/ })).toBeVisible();
   await page.getByRole('button', { name: 'Jeu 3 exos' }).click();
+  await expect(
+    page.locator('.preview-exercises').getByText('+10 kg', { exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Démarrer la séance', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Muscle-up focus', exact: true })).toBeVisible();
 }

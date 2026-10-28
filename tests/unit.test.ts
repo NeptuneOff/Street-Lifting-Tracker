@@ -221,7 +221,12 @@ describe('synchronisation sans écrasement silencieux', () => {
 });
 describe('persistance IndexedDB réelle', () => {
   it('conserve un accusé de synchronisation écrit pendant une transaction locale', async () => {
-    await initialize();
+    await initialize({
+      project: 'https://unit.supabase.co',
+      userId: 'owner',
+      name: 'Karl',
+      email: 'karl@example.test',
+    });
     const record = { ...getState().records[0], version: 'same-version', dirty: true };
     replaceRecords([record]);
     await Promise.resolve();
@@ -230,7 +235,12 @@ describe('persistance IndexedDB réelle', () => {
     expect((await readRecords()).find((r) => r.id === record.id)?.dirty).toBe(false);
   });
   it('sauvegarde une série et son résultat dans une transaction durable', async () => {
-    await initialize();
+    await initialize({
+      project: 'https://unit.supabase.co',
+      userId: 'owner',
+      name: 'Karl',
+      email: 'karl@example.test',
+    });
     const s = session();
     s.exercises[0] = toggleSet(s.exercises[0], s.exercises[0].blocks[2].id, 0);
     putPayload('session', s);

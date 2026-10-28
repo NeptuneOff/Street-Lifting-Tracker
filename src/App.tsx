@@ -13,13 +13,15 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { flush, initialize, putPayload, retrySave, useData } from './lib/store';
+import { flush, putPayload, retrySave, useData } from './lib/store';
 import { startSession } from './lib/training';
 import { getCloudClient } from './lib/sync';
 import { runSync, useCloudStatus } from './lib/cloud-status';
 import { AppContext, type Page } from './components/UI';
 import { initialTimer, Timer, unlockAudio } from './components/Timer';
 import { Home } from './pages/Home';
+import { useAccount } from './components/AccountGate';
+import { applyPWAUpdate, usePWAStatus } from './lib/pwa';
 const Workout = lazy(() => import('./pages/Workout').then((m) => ({ default: m.Workout })));
 const Progress = lazy(() => import('./pages/Progress').then((m) => ({ default: m.Progress })));
 const Program = lazy(() => import('./pages/Program').then((m) => ({ default: m.Program })));
@@ -39,16 +41,15 @@ function pageFromHash(): Page {
       ? 'settings'
       : 'home';
 }
-let swRegistration: ServiceWorkerRegistration | undefined;
 export function App() {
+  const { identity } = useAccount();
   const data = useData();
   const cloud = useCloudStatus();
+  const { ready: offlineReady, update } = usePWAStatus();
   const [page, setPage] = useState<Page>(pageFromHash),
     [message, setMessage] = useState(''),
     [timer, setTimer] = useState(initialTimer),
     [online, setOnline] = useState(navigator.onLine),
-    [offlineReady, setOfflineReady] = useState(false),
-    [update, setUpdate] = useState(false),
     [secondaryTab, setSecondaryTab] = useState(false);
   useEffect(() => {
     let release: (() => void) | undefined;
@@ -58,13 +59,10 @@ export function App() {
           setSecondaryTab(true);
           return;
         }
-        await initialize();
         await new Promise<void>((resolve) => {
           release = resolve;
         });
       });
-    } else {
-      void initialize();
     }
     return () => release?.();
   }, []);
@@ -127,41 +125,6 @@ export function App() {
     const timeout = setTimeout(() => void runSync(), 2500);
     return () => clearTimeout(timeout);
   }, [data.ready, dirtyVersions]);
-  useEffect(() => {
-    if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
-    let disposed = false;
-    void navigator.serviceWorker
-      .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
-      .then((registration) => {
-        swRegistration = registration;
-        if (registration.waiting) setUpdate(true);
-        registration.addEventListener('updatefound', () => {
-          const installing = registration.installing;
-          installing?.addEventListener('statechange', () => {
-            if (installing.state === 'installed' && navigator.serviceWorker.controller)
-              setUpdate(true);
-          });
-        });
-        return navigator.serviceWorker.ready;
-      })
-      .then(() => {
-        if (!disposed) setOfflineReady(true);
-      })
-      .catch(() => {
-        /* Local tracking still works. */
-      });
-    const controller = () => {
-      if (swRegistration?.waiting === null && sessionStorage.getItem('streetlift-updating')) {
-        sessionStorage.removeItem('streetlift-updating');
-        location.reload();
-      }
-    };
-    navigator.serviceWorker.addEventListener('controllerchange', controller);
-    return () => {
-      disposed = true;
-      navigator.serviceWorker.removeEventListener('controllerchange', controller);
-    };
-  }, []);
   const navigate = (next: Page) => {
     location.hash = next;
     setPage(next);
@@ -227,7 +190,7 @@ export function App() {
         },
       }}
     >
-      <div className="app-shell">
+      <div className="app-shell" key={identity.userId}>
         <aside className="sidebar">
           <a className="brand" href="#home" aria-label="StreetLift Accueil">
             <span className="brand-mark">
@@ -313,9 +276,7 @@ export function App() {
               <button
                 onClick={async () => {
                   try {
-                    await flush();
-                    sessionStorage.setItem('streetlift-updating', '1');
-                    swRegistration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+                    await applyPWAUpdate();
                   } catch {
                     setMessage('Sauvegarde locale requise avant la mise à jour.');
                   }

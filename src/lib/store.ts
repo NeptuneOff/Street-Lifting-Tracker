@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { seedRecords, uid } from './seed';
+import { workspaceKey, WorkspaceChangedError, type WorkspaceIdentity } from './workspace';
 import type {
   DataRecord,
   Exercise,
@@ -12,29 +13,47 @@ import type {
   Weight,
 } from './types';
 
-let dbPromise: Promise<IDBDatabase> | undefined;
+interface Workspace {
+  key: string;
+  identity: WorkspaceIdentity;
+  db?: Promise<IDBDatabase>;
+  writes: Promise<void>;
+  pending: number;
+  unsaved: Map<string, DataRecord>;
+  channel?: BroadcastChannel;
+}
+let active: Workspace | null = null;
+const workspaces = new Map<string, Workspace>();
 let state: State = { records: [], ready: false, saving: false, error: '' };
 const listeners = new Set<() => void>();
-let writes = Promise.resolve();
-let pending = 0;
-const unsaved = new Map<string, DataRecord>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
   listeners.forEach((f) => f());
 };
-export function openDatabase() {
-  dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open('streetlift-v1', 1);
+function current() {
+  if (!active) throw new Error('Connexion requise pour accéder au carnet.');
+  return active;
+}
+export const getWorkspaceKey = () => active?.key ?? null;
+export const getWorkspaceIdentity = () => active?.identity ?? null;
+export const workspaceStorageKey = (suffix: string) => `streetlift:${current().key}:${suffix}`;
+export function assertWorkspace(key: string) {
+  if (active?.key !== key) throw new WorkspaceChangedError();
+}
+function openFor(workspace: Workspace) {
+  workspace.db ??= new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(`streetlift-v2:${workspace.key}`, 1);
     request.onupgradeneeded = () => request.result.createObjectStore('records', { keyPath: 'id' });
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
     request.onblocked = () =>
       reject(new Error('Ferme les autres onglets pour mettre à jour le stockage.'));
   });
-  return dbPromise;
+  return workspace.db;
 }
-export async function writeRecords(records: DataRecord[]) {
-  const db = await openDatabase();
+export const openDatabase = () => openFor(current());
+async function writeFor(workspace: Workspace, records: DataRecord[]) {
+  const db = await openFor(workspace);
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction('records', 'readwrite');
     records.forEach((record) => transaction.objectStore('records').put(record));
@@ -43,78 +62,134 @@ export async function writeRecords(records: DataRecord[]) {
     transaction.onabort = () => reject(transaction.error || new Error('Sauvegarde interrompue.'));
   });
 }
-export async function readRecords() {
-  const db = await openDatabase();
+export const writeRecords = (records: DataRecord[]) => writeFor(current(), records);
+async function readFor(workspace: Workspace) {
+  const db = await openFor(workspace);
   return new Promise<DataRecord[]>((resolve, reject) => {
     const request = db.transaction('records').objectStore('records').getAll();
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
-export async function initialize() {
+export const readRecords = () => readFor(current());
+async function ownedLegacy(identity: WorkspaceIdentity): Promise<DataRecord[] | null> {
+  // Never assign an unowned pre-account notebook to the next person signing in.
+  const binding = globalThis.localStorage?.getItem('streetlift-bound-account');
+  const project = new URL(identity.project).origin;
+  if (binding !== `${project}:${identity.userId}` && binding !== `${project}/:${identity.userId}`)
+    return null;
+  return new Promise((resolve) => {
+    const request = indexedDB.open('streetlift-v1');
+    request.onupgradeneeded = () => request.transaction?.abort();
+    request.onerror = () => resolve(null);
+    request.onsuccess = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('records')) {
+        db.close();
+        resolve(null);
+        return;
+      }
+      const records = db.transaction('records').objectStore('records').getAll();
+      records.onsuccess = () => {
+        db.close();
+        resolve(records.result);
+      };
+      records.onerror = () => {
+        db.close();
+        resolve(null);
+      };
+    };
+  });
+}
+export function clearWorkspace() {
+  active?.channel?.close();
+  if (active) active.channel = undefined;
+  active = null;
+  emit({ records: [], ready: false, saving: false, error: '' });
+}
+export async function initialize(identity: WorkspaceIdentity) {
+  clearWorkspace();
+  const key = workspaceKey(identity);
+  const workspace: Workspace = workspaces.get(key) ?? {
+    key,
+    identity,
+    writes: Promise.resolve(),
+    pending: 0,
+    unsaved: new Map(),
+  };
+  workspaces.set(key, workspace);
+  active = workspace;
   try {
-    let records = await readRecords();
-    if (!records.length) {
-      records = seedRecords();
-      await writeRecords(records);
+    await workspace.writes.catch(() => {});
+    if (workspace.unsaved.size) {
+      await writeFor(workspace, [...workspace.unsaved.values()]);
+      workspace.unsaved.clear();
     }
+    let records = await readFor(workspace);
+    if (!records.length) {
+      records = (await ownedLegacy(identity)) ?? seedRecords({ name: identity.name, blank: true });
+      await writeFor(workspace, records);
+    }
+    if (active !== workspace) return;
     emit({ records, ready: true, error: '' });
     if (typeof BroadcastChannel !== 'undefined') {
-      channel ??= new BroadcastChannel('streetlift-data');
-      channel.onmessage = async () => {
+      workspace.channel = new BroadcastChannel(`streetlift-data:${key}`);
+      workspace.channel.onmessage = async () => {
         try {
-          await writes;
-          emit({ records: await readRecords() });
+          await workspace.writes;
+          const records = await readFor(workspace);
+          if (active === workspace) emit({ records });
         } catch {
-          /* Keep unsaved in-memory data available for export/retry. */
+          /* Keep unsaved data for its owner. */
         }
       };
     }
   } catch (error) {
-    dbPromise = undefined;
-    emit({ error: `Stockage indisponible : ${String(error)}` });
+    workspace.db = undefined;
+    if (active === workspace) emit({ error: `Stockage indisponible : ${String(error)}` });
   }
 }
-let channel: BroadcastChannel | undefined;
-function persist(records: DataRecord[]) {
-  records.forEach((record) => unsaved.set(record.id, record));
-  pending++;
-  emit({ saving: true });
-  writes = writes
+function persist(workspace: Workspace, records: DataRecord[]) {
+  records.forEach((record) => workspace.unsaved.set(record.id, record));
+  workspace.pending++;
+  if (active === workspace) emit({ saving: true });
+  workspace.writes = workspace.writes
     .catch(() => {})
     .then(async () => {
-      const batch = [...unsaved.values()];
+      const batch = [...workspace.unsaved.values()];
       if (!batch.length) return;
-      await writeRecords(batch);
+      await writeFor(workspace, batch);
       batch.forEach((record) => {
-        if (unsaved.get(record.id) === record) unsaved.delete(record.id);
+        if (workspace.unsaved.get(record.id) === record) workspace.unsaved.delete(record.id);
       });
-    })
-    .then(() => {
-      channel?.postMessage('changed');
-      if (!unsaved.size) emit({ error: '' });
+      workspace.channel?.postMessage('changed');
+      if (active === workspace && !workspace.unsaved.size) emit({ error: '' });
     })
     .catch((error) => {
-      emit({
-        error: `Échec de sauvegarde locale. Exporte tes données avant de fermer. ${String(error)}`,
-      });
+      if (active === workspace)
+        emit({
+          error: `Échec de sauvegarde locale. Exporte tes données avant de fermer. ${String(error)}`,
+        });
       throw error;
     })
     .finally(() => {
-      pending--;
-      emit({ saving: pending > 0 });
+      workspace.pending--;
+      if (active === workspace) emit({ saving: workspace.pending > 0 });
     });
-  // Consumers can await flush() for critical transitions; suppress unhandled rejections here.
-  void writes.catch(() => {});
+  void workspace.writes.catch(() => {});
 }
-export const flush = () => writes;
-export const retrySave = () => persist(state.records);
+export const flush = () => active?.writes ?? Promise.resolve();
+export const flushAll = () =>
+  Promise.all([...workspaces.values()].map((workspace) => workspace.writes));
+export const retrySave = () => persist(current(), state.records);
 export const getState = () => state;
-export function replaceRecords(changed: DataRecord[]) {
+export function replaceRecords(changed: DataRecord[], expectedWorkspace?: string) {
+  if (expectedWorkspace) assertWorkspace(expectedWorkspace);
+  const workspace = current();
   const map = new Map(state.records.map((record) => [record.id, record]));
   changed.forEach((record) => map.set(record.id, record));
   emit({ records: [...map.values()] });
-  persist(changed);
+  persist(workspace, changed);
 }
 export function putPayload(kind: Kind, payload: Payload) {
   const existing = state.records.find((record) => record.id === payload.id);

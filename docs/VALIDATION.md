@@ -2,6 +2,12 @@
 
 ## Vérifications automatisées
 
+`npm test` exécute également les règles PostgreSQL dans PGlite : programmes de même identifiant pour deux utilisateurs, refus des lectures et écritures croisées, interdiction de réaffecter une ligne, refus du rôle anonyme et d’une session sans identité. Une politique permissive ajoutée par erreur ne doit pas contourner la garde restrictive.
+
+Les tests IndexedDB vérifient la séparation par compte et par projet, les écritures en cours lors du changement de compte, le refus d’une réponse différée et la migration de l’ancien carnet seulement vers son propriétaire déjà identifié.
+
+Les parcours Auth utilisent un serveur simulé : écran fermé sans connexion, inscription avec confirmation e-mail, connexion A → modification → déconnexion → connexion B → retour à A. Le programme, le RIR, la séance en cours et le chronomètre ne doivent jamais apparaître dans l’autre compte. Un test retarde volontairement une réponse réseau du compte A jusqu’après la connexion de B.
+
 `npm test` couvre les snapshots immuables (charges fixes et dynamiques), la résistance totale avec poids de corps, l’arrondi, les séries facultatives, les pics partiels/non validés, les tendances comparables, les moyennes de poids, les imports invalides, l’aller-retour des sauvegardes, la neutralisation des formules CSV, la décision de conflit, le refus des clés privées et une transaction IndexedDB.
 
 `npm run test:e2e` couvre sur mobile et desktop :
@@ -17,7 +23,7 @@ Les parcours s’exécutent sur `npm run build` + `preview`, pas sur le serveur 
 
 ## Recette Supabase à réaliser après configuration d’un projet
 
-1. Exécuter la migration et confirmer RLS activé dans Supabase.
+1. Exécuter les migrations 001 et 002 et confirmer RLS activé dans Supabase.
 2. Compte A : se connecter et synchroniser une séance sur le premier appareil.
 3. Compte A sur appareil vierge : synchroniser et retrouver la séance sans doublon. Les seeds intacts doivent céder la place aux réglages distants.
 4. Enregistrer hors ligne sur le deuxième appareil, rouvrir en ligne et retrouver les données sur le premier.

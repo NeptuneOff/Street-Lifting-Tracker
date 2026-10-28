@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play, Timer as TimerIcon, X, RotateCcw } from 'lucide-react';
 import { IconButton } from './UI';
+import { workspaceStorageKey } from '../lib/store';
 export interface TimerValue {
   end: number | null;
   remaining: number;
@@ -9,7 +10,7 @@ export interface TimerValue {
 export const initialTimer = (): TimerValue => {
   try {
     return (
-      JSON.parse(localStorage.getItem('streetlift-timer') || 'null') ?? {
+      JSON.parse(localStorage.getItem(workspaceStorageKey('timer')) || 'null') ?? {
         end: null,
         remaining: 180,
         visible: false,
@@ -60,7 +61,7 @@ export function Timer({
   const [now, setNow] = useState(Date.now());
   const announced = useRef<number | null>(null);
   useEffect(() => {
-    localStorage.setItem('streetlift-timer', JSON.stringify(value));
+    localStorage.setItem(workspaceStorageKey('timer'), JSON.stringify(value));
   }, [value]);
   useEffect(() => {
     if (!value.end) return;

@@ -1,6 +1,6 @@
 # StreetLift Tracker
 
-Carnet personnel de street lifting, pensé pour cocher ses séries sur téléphone. React + TypeScript + Vite, IndexedDB pour les données, PWA pour le hors connexion, Supabase optionnel pour la synchronisation entre appareils.
+Carnet personnel de street lifting, pensé pour cocher ses séries sur téléphone. React + TypeScript + Vite, IndexedDB pour les données, PWA pour le hors connexion, Supabase pour les comptes privés et la synchronisation entre appareils. La connexion est obligatoire avant tout accès au carnet.
 
 **Application : https://neptuneoff.github.io/Street-Lifting-Tracker/**
 
@@ -27,6 +27,7 @@ Le service worker est actif uniquement dans le build de production (`preview` ou
 
 ## Utilisation
 
+0. **Connexion** : créer son compte ou se connecter (e-mail/mot de passe ou lien par e-mail).
 1. **Accueil** : choisir le jour, puis démarrer ou reprendre la séance.
 2. **Entraînement** : toucher les séries réalisées. Le pic est prérempli ; cocher une série du bloc principal confirme sa réalisation. Le bouton « Valider le pic » valide ce bloc d’un geste. Ajuster charge, séries ou répétitions seulement si nécessaire. RIR et commentaire sont facultatifs.
 3. **Terminer** : confirmer l’enregistrement. Une séance partielle est conservée comme telle. Les séries facultatives ne réduisent jamais le taux de réalisation. Un pic non validé est exclu des graphiques et records.
@@ -34,11 +35,11 @@ Le service worker est actif uniquement dans le build de production (`preview` ou
 5. **Programme** : édition complète des jours, exercices, ordre, phases, séries, reps, charges, repos et blocs facultatifs. Duplication des séances, exercices et blocs.
 6. **Paramètres** : profil, références 1RM, bibliothèque d’exercices, pesées, sauvegardes et compte Supabase.
 
-Les seules données initiales sont les références et les programmes. **Aucune séance historique ou pesée fictive n’est injectée.** Le poids de profil de 76,5 kg est une référence de départ, pas une mesure datée.
+Chaque nouveau compte reçoit une copie indépendante du programme de base, avec des références 1RM à renseigner (0 kg), 0 kg de lest et 20 kg pour les blocs de squat. Le poids du profil (75 kg) est une valeur à ajuster, pas une pesée enregistrée. **Aucune donnée personnelle ni performance d’un autre utilisateur n’est copiée.**
 
 ### Programme initial : valeurs de départ
 
-Les quatre journées et les références reprennent le cahier des charges. Le squat du mardi reprend exactement l’exemple 40 / 60 / 80 / 60 / 50 kg. La traction du jeudi reprend +50 kg en 2×3. Le reste est une **base illustrative à ajuster**, car le programme Excel complet n’a pas été fourni. Toutes ces valeurs sont modifiables ; ce ne sont pas des recommandations personnalisées d’intensité.
+Les quatre journées reprennent la structure du cahier des charges et restent entièrement modifiables pour chaque compte. Les valeurs personnalisées de la première version (notamment le squat 40 / 60 / 80 / 60 / 50 et la traction du jeudi à +50 kg) sont conservées dans les carnets existants et leurs sauvegardes ; elles ne sont plus attribuées automatiquement aux nouveaux utilisateurs.
 
 Planche et Front lever restent des notes libres sans suivi imposé.
 
@@ -78,35 +79,48 @@ IndexedDB conserve les programmes, séances en cours, résultats, pesées et mod
 
 Une mise à jour PWA n’impose pas de rechargement au milieu de la séance : le bouton de mise à jour attend les écritures avant de basculer. Le chronomètre utilise une échéance absolue, conservée localement, pour rester correct après navigation ou rechargement. Le son/vibration dépend du navigateur ; **aucune alarme en arrière-plan n’est garantie lorsque l’application est fermée**.
 
+L’accès hors connexion nécessite une session utilisateur encore disponible. Si la session a expiré et ne peut pas être renouvelée sans réseau, l’écran de connexion reste fermé plutôt que d’afficher un carnet sans identité.
+
 Le navigateur peut supprimer les données en navigation privée, après effacement des données du site ou sous pression de stockage. Un export régulier ou Supabase protège contre cette perte.
 
-## Configurer Supabase (optionnel)
+## Activer les comptes privés avec Supabase
 
-L’application locale ne nécessite aucune clé et aucun compte. Pour synchroniser :
+**Sans configuration, l’application affiche un écran d’activation et ne charge aucun carnet.** Pour ouvrir la connexion et l’inscription à tous les visiteurs :
 
-1. Créer un projet Supabase.
-2. Exécuter [`supabase/migrations/001_training_records.sql`](supabase/migrations/001_training_records.sql) dans son SQL Editor.
-3. Activer l’authentification Email. Dans **Authentication → URL Configuration**, définir le Site URL et ajouter l’URL de redirection : `https://neptuneoff.github.io/Street-Lifting-Tracker/` (et l’URL localhost de développement si nécessaire).
-4. Dans StreetLift → Paramètres, saisir l’URL du projet et sa **clé publique publishable** (`sb_publishable_…`) ou **anon** historique.
-5. Enregistrer, saisir son e-mail, puis utiliser le lien de connexion reçu **sur le même appareil/navigateur**. Le fournisseur e-mail et ses limites sont ceux de ton projet Supabase.
-6. Synchroniser. Sur le second appareil, configurer le même projet et se connecter au même compte. Les valeurs de départ intactes cèdent automatiquement la place aux données distantes.
+1. Créer un projet Supabase et activer le fournisseur **Email** avec confirmation des adresses.
+2. Dans son SQL Editor, exécuter dans cet ordre [`001_training_records.sql`](supabase/migrations/001_training_records.sql) puis [`002_private_accounts.sql`](supabase/migrations/002_private_accounts.sql). Sur une installation existante ayant déjà exécuté 001, ajouter seulement 002.
+3. Dans **Authentication → URL Configuration**, définir le Site URL et autoriser `https://neptuneoff.github.io/Street-Lifting-Tracker/` comme URL de redirection. Ajouter l’URL localhost si besoin pour le développement.
+4. Dans GitHub → **Settings → Secrets and variables → Actions → Variables**, définir `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` avec l’URL du projet et sa clé **publique publishable** (`sb_publishable_…`) ou **anon** historique.
+5. Relancer le workflow complet pour reconstruire et publier l’application avec ces variables.
+6. Chaque personne crée son compte, confirme son e-mail, puis se connecte. Le prénom, les charges, les programmes, séances, pesées et références lui appartiennent. La même identité retrouve son carnet sur un deuxième appareil.
 
-Alternative au paramétrage dans l’interface : copier `.env.example` en `.env.local` pour le développement. Pour GitHub Actions, créer les **variables publiques** de dépôt `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`. Les variables Vite sont intégrées au JavaScript public : **ne jamais y mettre une clé secret ou service_role**. L’interface refuse ces clés privées. Les jetons d’authentification restent dans le navigateur et sont exclus des exports.
+Le fournisseur e-mail et ses limites sont ceux du projet Supabase. Le formulaire propose également une connexion par lien e-mail. Aucun mot de passe utilisateur n’est sauvegardé par le code de l’application.
+
+Pour développer, copier `.env.example` vers `.env.local`. Le volet « Configurer l’application » de l’écran de connexion peut configurer un projet sur un navigateur particulier ; les variables GitHub ci-dessus restent nécessaires pour fournir la configuration par défaut à tous les visiteurs. Une clé secret ou service_role ne doit jamais entrer dans le frontend. L’interface refuse ces clés privées.
+
+### Isolation locale, déconnexion et migration
+
+- Aucun écran personnel ni export n’est accessible avant connexion, y compris via un lien direct `#program` ou `#progress`.
+- Chaque couple **projet Supabase + identifiant utilisateur** dispose d’une base IndexedDB distincte. Le chronomètre, la dernière synchronisation et les communications entre onglets sont également séparés.
+- La déconnexion masque immédiatement les données en mémoire, remet les statuts de synchronisation à zéro et vide la session locale. Un autre compte ouvre un autre carnet. Revenir au premier compte restaure ses données, sans réaffectation.
+- Les requêtes de synchronisation utilisent le JWT capturé au démarrage de l’opération. Une réponse en retard, un import de fichier ou une fin de séance suspendue ne peuvent pas écrire dans un compte devenu actif entre-temps.
+- L’ancien stockage `streetlift-v1` n’est pas supprimé. Il est migré uniquement si l’ancienne association compte/projet correspond exactement au compte connecté. Un ancien carnet **sans propriétaire connu est conservé à part**, sans être attribué à la prochaine personne qui se connecte ; une sauvegarde JSON appartenant à son utilisateur peut être restaurée explicitement dans son compte.
+- Les caches locaux sont stockés sur l’appareil, sans chiffrement propre à l’application. La protection contre un accès au système de fichiers ou aux outils développeur d’un navigateur partagé relève du profil de navigateur et du compte système ; utiliser des profils séparés pour ce niveau de confidentialité. La séparation des données distantes est imposée côté PostgreSQL, pas par un filtre d’affichage.
 
 ### Sécurité et résolution de conflits
 
-- RLS sur chaque ligne, indexée par `(user_id, id)`, avec lecture/écriture réservées à `auth.uid()`.
+- RLS activée et forcée sur chaque ligne, indexée par `(user_id, id)`, avec lecture/écriture réservées à `auth.uid()`. Une politique restrictive garde cette isolation même si une politique permissive trop large est ajoutée par erreur.
 - RPC `SECURITY INVOKER`, sans élévation de privilèges et inaccessible au rôle `anon`.
 - Comparaison optimiste de version UUID et verrou transactionnel côté PostgreSQL. Une modification concurrente ne peut pas écraser silencieusement une autre version.
 - Les suppressions sont des tombstones synchronisés, afin d’éviter la réapparition d’une séance supprimée.
 - Répéter un envoi de même version est idempotent. Les lectures distantes sont paginées.
 - Les conflits sont affichés dans les paramètres, avec les deux contenus et une confirmation avant choix.
 - Synchronisation après modification (délai court), au retour réseau, après authentification, toutes les 30 s tant que l’application reste ouverte, ou manuellement. Les changements hors ligne restent dans IndexedDB jusqu’à la prochaine ouverture connectée.
-- Un carnet local est lié au premier couple compte/projet utilisé. Changer de compte n’envoie pas automatiquement les données au nouveau compte ; utiliser un autre profil de navigateur pour un autre compte.
+- Un même navigateur peut utiliser plusieurs comptes successivement : chaque espace est indépendant, sans réutilisation des données du précédent.
 
 Documentation : https://supabase.com/docs/guides/database/postgres/row-level-security et https://supabase.com/docs/reference/javascript/auth-signinwithotp
 
-La connexion PC/téléphone et les politiques RLS doivent être vérifiées sur ton projet une fois configuré ; aucun projet Supabase réel ni identifiant n’est fourni avec ce dépôt. Voir [`docs/VALIDATION.md`](docs/VALIDATION.md).
+Les politiques RLS et la RPC sont testées automatiquement dans un moteur PostgreSQL embarqué (PGlite), avec deux rôles utilisateurs et le rôle anonyme. Les parcours navigateur testent le changement de compte avec un service Auth simulé. La réception réelle des e-mails et la synchronisation PC/téléphone doivent être vérifiées sur le projet une fois configuré ; aucun projet Supabase ni identifiant utilisateur réel n’est fourni. Voir [`docs/VALIDATION.md`](docs/VALIDATION.md).
 
 ## Sauvegarder et importer
 
@@ -131,7 +145,9 @@ Mardi;Squat & statiques;squat;Force;Pic;3;3;fixed;80;300;non;total
 src/lib/types.ts        Entités, prescriptions et snapshots
 src/lib/seed.ts         Programme initial modifiable
 src/lib/training.ts     Calculs, validation de séries et tendances
-src/lib/store.ts        IndexedDB, transactions et état React
+src/components/AccountGate.tsx  Connexion, inscription et déconnexion
+src/lib/workspace.ts    Identité et périmètre de chaque carnet
+src/lib/store.ts        IndexedDB séparée par compte, transactions et état React
 src/lib/backup.ts       Validation, import/export JSON et CSV
 src/lib/sync.ts         Supabase, versions et conflits
 src/pages/              Accueil, séance, progression, programme, paramètres
