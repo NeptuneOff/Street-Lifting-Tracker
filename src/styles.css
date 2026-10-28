@@ -1467,7 +1467,7 @@ textarea::placeholder {
   font-weight: 400;
   letter-spacing: 0;
 }
-.chart svg {
+.chart > svg[role='img'] {
   width: 100%;
   height: auto;
   display: block;

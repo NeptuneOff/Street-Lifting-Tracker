@@ -31,7 +31,7 @@ Le service worker est actif uniquement dans le build de production (`preview` ou
 1. **Accueil** : choisir le jour, puis démarrer ou reprendre la séance.
 2. **Entraînement** : toucher les séries réalisées. Le pic est prérempli ; cocher une série du bloc principal confirme sa réalisation. Le bouton « Valider le pic » valide ce bloc d’un geste. Ajuster charge, séries ou répétitions seulement si nécessaire. RIR et commentaire sont facultatifs.
 3. **Terminer** : confirmer l’enregistrement. Une séance partielle est conservée comme telle. Les séries facultatives ne réduisent jamais le taux de réalisation. Un pic non validé est exclu des graphiques et records.
-4. **Progression** : courbes par exercice, filtres de période/type/répétitions, records de singles issus du carnet, historique détaillé et poids de corps.
+4. **Progression** : tableau de suivi, filtres de période/type/répétitions/mesure, vue d’ensemble ou focus sur un mouvement, courbes interactives et légendes contrôlables, records de singles issus du carnet, historique recherchable et poids de corps.
 5. **Programme** : édition complète des jours, exercices, ordre, phases, séries, reps, charges, repos et blocs facultatifs. Duplication des séances, exercices et blocs.
 6. **Paramètres** : profil, références 1RM, bibliothèque d’exercices, pesées, sauvegardes et compte Supabase.
 
@@ -48,6 +48,15 @@ Elle contient 12 semaines de suivi entièrement fictif : quatre journées d’en
 - **Réinitialiser la démo** restaure les données fictives après confirmation, sans toucher aux carnets personnels.
 - **Quitter la démo** retourne à l’accueil ou au compte déjà connecté, sans déconnecter celui-ci.
 - Aucun identifiant partagé, mot de passe public ou compte réel n’est créé. Chaque navigateur dispose de sa propre copie, séparée des comptes privés.
+
+### Explorer le suivi
+
+- **Filtres** : choisir une période, une charge réalisée ou un 1RM estimé, un type et un nombre de répétitions. Les boutons de mouvement passent de la vue d’ensemble à une courbe agrandie. Le bouton **Points** masque ou affiche les marqueurs.
+- **Légende interactive** : chaque ligne indique le type, le format séries × reps, le nombre de points et la dernière valeur. La case masque/affiche cette série, la cible l’isole et **Tout afficher** restaure la sélection. Force en vert, volume en bleu, technique en orange ; les formats conservent aussi leur tracé et leur libellé.
+- **Lecture exacte** : survoler ou toucher le graphique pour sélectionner une date ; toucher épingle la sélection. Les flèches et le curseur parcourent les dates au doigt ou au clavier. Le panneau indique charge, RIR, poids de corps et commentaire enregistrés ; **Voir la séance** ouvre son snapshot. **Libérer** reprend la lecture au survol.
+- **Repères** : le dernier pic et le maximum de la période suivent les filtres. Un maximum tous formats n’est pas une comparaison de tendance. Le record réalisé sur un single est explicitement indiqué toutes périodes et reste distinct du 1RM estimé ou d’une référence déclarée.
+- **Poids et historique** : les pesées et moyennes hebdomadaires se masquent séparément, comme la limite de catégorie. La recherche retrouve noms de séances, exercices et commentaires. Chaque séance affiche ses charges réalisées avant d’ouvrir le détail.
+- **Animations** : le sélecteur en haut de l’application propose **Fluides**, **Discrètes** et **Désactivées**. La préférence est mémorisée sur cet appareil, sans modifier les données du carnet. La réduction des animations demandée par le système reste prioritaire. Les cartes apparaissent au défilement, les courbes se dessinent, et la navigation, les fenêtres et la validation des séries ont un retour animé.
 
 ### Programme initial : valeurs de départ
 

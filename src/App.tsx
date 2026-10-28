@@ -10,6 +10,7 @@ import {
   Menu,
   Settings2,
   ShieldCheck,
+  Sparkles,
   WifiOff,
   X,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { runSync, useCloudStatus } from './lib/cloud-status';
 import { AppContext, type Page } from './components/UI';
 import { initialTimer, Timer, unlockAudio } from './components/Timer';
 import { Home } from './pages/Home';
+import { useMotion, usePageReveals, type MotionPreference } from './lib/motion';
 import { useAccount } from './components/AccountGate';
 import { applyPWAUpdate, usePWAStatus } from './lib/pwa';
 const Workout = lazy(() => import('./pages/Workout').then((m) => ({ default: m.Workout })));
@@ -46,6 +48,7 @@ export function App() {
   const { identity, signOut, resetDemo } = useAccount();
   const isDemo = identity.mode === 'demo';
   const data = useData();
+  const [motion, setMotion] = useMotion();
   const cloud = useCloudStatus();
   const { ready: offlineReady, update } = usePWAStatus();
   const [page, setPage] = useState<Page>(pageFromHash),
@@ -53,6 +56,7 @@ export function App() {
     [timer, setTimer] = useState(initialTimer),
     [online, setOnline] = useState(navigator.onLine),
     [secondaryTab, setSecondaryTab] = useState(false);
+  usePageReveals(page);
   useEffect(() => {
     let release: (() => void) | undefined;
     if (navigator.locks) {
@@ -248,28 +252,45 @@ export function App() {
               <span>/</span>
               <strong>{navigation.find((n) => n.id === page)?.label}</strong>
             </div>
-            <div className="connection-status">
-              {!online ? (
-                <>
-                  <WifiOff size={14} />
-                  <span>Hors connexion · local actif</span>
-                </>
-              ) : data.saving ? (
-                <>
-                  <span className="pulse" />
-                  <span>Sauvegarde…</span>
-                </>
-              ) : data.error ? (
-                <>
-                  <CloudOff size={14} />
-                  <span>Erreur de sauvegarde</span>
-                </>
-              ) : (
-                <>
-                  <span className="status-dot" />
-                  <span>{cloud.busy ? 'Synchronisation…' : 'Sauvegarde locale active'}</span>
-                </>
-              )}
+            <div className="topbar-actions">
+              <label
+                className="motion-control"
+                title="Animations de l’interface · respecte aussi les préférences de ton appareil"
+              >
+                <Sparkles size={14} />
+                <select
+                  aria-label="Animations de l’interface"
+                  value={motion}
+                  onChange={(event) => setMotion(event.target.value as MotionPreference)}
+                >
+                  <option value="full">Fluides</option>
+                  <option value="reduced">Discrètes</option>
+                  <option value="off">Désactivées</option>
+                </select>
+              </label>
+              <div className="connection-status">
+                {!online ? (
+                  <>
+                    <WifiOff size={14} />
+                    <span>Hors connexion · local actif</span>
+                  </>
+                ) : data.saving ? (
+                  <>
+                    <span className="pulse" />
+                    <span>Sauvegarde…</span>
+                  </>
+                ) : data.error ? (
+                  <>
+                    <CloudOff size={14} />
+                    <span>Erreur de sauvegarde</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="status-dot" />
+                    <span>{cloud.busy ? 'Synchronisation…' : 'Sauvegarde locale active'}</span>
+                  </>
+                )}
+              </div>
             </div>
           </header>
           {isDemo && (

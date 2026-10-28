@@ -1,0 +1,376 @@
+:root {
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+button,
+.card,
+.brand-mark,
+.segmented button,
+select,
+.history-row > svg,
+summary > svg {
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 240ms ease,
+    transform 300ms var(--motion-ease);
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input[type='range']:focus-visible {
+  outline: 2px solid #c2f36b;
+  outline-offset: 4px;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+main {
+  animation: page-arrive 420ms var(--motion-ease) both;
+}
+.page-title .eyebrow {
+  animation: fade-in 450ms ease both;
+}
+.page-title h1 {
+  animation: title-arrive 580ms var(--motion-ease) both;
+}
+.motion-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 600ms var(--motion-ease),
+    transform 650ms var(--motion-ease),
+    border-color 200ms,
+    box-shadow 250ms;
+}
+.motion-reveal.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+.tracking-stat:nth-child(2),
+.stat-card:nth-child(2) {
+  transition-delay: 65ms;
+}
+.tracking-stat:nth-child(3),
+.stat-card:nth-child(3) {
+  transition-delay: 125ms;
+}
+.motion-reveal.is-revealed .chart-line {
+  animation: draw-curve 1100ms var(--motion-ease) both;
+}
+.motion-reveal.is-revealed .chart-dot {
+  animation: dot-arrive 450ms 350ms var(--motion-ease) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.chart-current,
+.tracking-stat strong {
+  animation: value-arrive 420ms var(--motion-ease) both;
+}
+.chart-inspector,
+.legend-row {
+  transition:
+    border-color 200ms,
+    background 200ms,
+    opacity 200ms;
+}
+.legend-check {
+  transition:
+    background 200ms,
+    border-color 200ms,
+    transform 200ms var(--motion-ease);
+}
+.legend-check svg {
+  animation: check-arrive 250ms var(--motion-ease);
+}
+.legend-toggle:active .legend-check {
+  transform: scale(0.85);
+}
+.sidebar nav button.active,
+.mobile-nav button.active {
+  animation: nav-arrive 380ms var(--motion-ease);
+}
+.sidebar nav button.active > svg,
+.mobile-nav button.active > svg {
+  animation: icon-arrive 450ms var(--motion-ease);
+}
+.sidebar nav button.active {
+  box-shadow: inset 2px 0 0 #c2f36b;
+}
+.mobile-nav button {
+  border-radius: 9px;
+}
+.mobile-nav button.active {
+  background: #c2f36b0b;
+}
+.exercise-body {
+  animation: accordion-arrive 380ms var(--motion-ease) both;
+  transform-origin: top;
+}
+.set-button.checked {
+  animation: set-complete 350ms var(--motion-ease);
+}
+.set-button.checked > svg {
+  animation: check-arrive 300ms var(--motion-ease);
+}
+.exercise-card-head > .tag {
+  transition:
+    color 200ms,
+    background 200ms,
+    border-color 200ms;
+}
+.exercise-card.open {
+  border-color: #718950;
+}
+.progress-track > i,
+.progress-track > span,
+.progress-bar > span {
+  transition: width 500ms var(--motion-ease);
+}
+.modal[open] {
+  animation: modal-arrive 300ms var(--motion-ease) both;
+}
+.modal[open]::backdrop {
+  animation: fade-in 250ms ease both;
+}
+.modal.is-closing {
+  animation: modal-leave 180ms ease both;
+}
+.modal.is-closing::backdrop {
+  animation: fade-out 180ms ease both;
+}
+.toast {
+  animation: toast-arrive 450ms var(--motion-ease) both;
+}
+.timer,
+.timer-launch {
+  animation: panel-arrive 400ms var(--motion-ease) both;
+}
+.account-card {
+  animation: modal-arrive 650ms var(--motion-ease) both;
+}
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px #0002;
+  }
+  .button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+  }
+  .history-row:hover {
+    background: #263220;
+    border-color: #698850;
+    transform: translateX(3px);
+  }
+  .history-row:hover > svg {
+    transform: translateX(3px);
+    color: var(--lime);
+  }
+  .stat-card:hover,
+  .program-choice:hover,
+  .tracking-stat:hover {
+    transform: translateY(-3px);
+    border-color: #5b7347;
+    box-shadow: 0 10px 30px #0002;
+  }
+  .brand:hover .brand-mark {
+    transform: rotate(5deg) scale(1.05);
+  }
+  .legend-isolate:hover > svg {
+    transform: rotate(90deg);
+  }
+  .movement-tabs button:hover,
+  .points-toggle:hover {
+    border-color: #8aa870;
+    background: #314329;
+  }
+}
+@keyframes page-arrive {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes title-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes draw-curve {
+  from {
+    clip-path: inset(-15px 100% -15px -15px);
+  }
+  to {
+    clip-path: inset(-15px -15px -15px -15px);
+  }
+}
+@keyframes dot-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes value-arrive {
+  from {
+    opacity: 0.2;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes nav-arrive {
+  from {
+    background-color: #c2f36b00;
+  }
+  to {
+    background-color: #c2f36b0b;
+  }
+}
+@keyframes icon-arrive {
+  0% {
+    transform: scale(0.85);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes accordion-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes set-complete {
+  0% {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes check-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-25deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes modal-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes modal-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+}
+@keyframes toast-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes panel-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 140ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 140ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion='reduced'] .motion-reveal {
+  transform: none;
+}
+html[data-motion='off'] *,
+html[data-motion='off'] *::before,
+html[data-motion='off'] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion='off'] .motion-reveal {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .motion-reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

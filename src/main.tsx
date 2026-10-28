@@ -5,6 +5,10 @@ import { AccountGate } from './components/AccountGate';
 import { backupJSON, downloadFile } from './lib/backup';
 import { getState } from './lib/store';
 import './styles.css';
+import './tracking.css';
+import './motion.css';
+import { initializeMotion } from './lib/motion';
+initializeMotion();
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {

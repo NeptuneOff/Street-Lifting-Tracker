@@ -41,21 +41,35 @@ export function Modal({
   close: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const closingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     ref.current?.showModal();
+    return () => clearTimeout(closingTimer.current);
   }, []);
+  const requestClose = () => {
+    if (closing) return;
+    const motion = document.documentElement.dataset.motion;
+    if (motion === 'off' || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      return close();
+    setClosing(true);
+    closingTimer.current = setTimeout(close, motion === 'reduced' ? 140 : 180);
+  };
   return (
     <dialog
       ref={ref}
-      className="modal"
-      onCancel={close}
+      className={`modal ${closing ? 'is-closing' : ''}`}
+      onCancel={(event) => {
+        event.preventDefault();
+        requestClose();
+      }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) close();
+        if (e.target === e.currentTarget) requestClose();
       }}
     >
       <div className="modal-head">
         <h2>{title}</h2>
-        <IconButton label="Fermer" onClick={close}>
+        <IconButton label="Fermer" onClick={requestClose}>
           <X size={20} />
         </IconButton>
       </div>
