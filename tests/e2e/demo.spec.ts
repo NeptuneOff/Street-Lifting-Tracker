@@ -33,6 +33,8 @@ test('démo sans Supabase : graphiques remplis, historique détaillé et réinit
     .click();
   await page.getByLabel('Nom de la séance', { exact: true }).fill('MODIFICATION DEMO');
   await page.getByRole('button', { name: 'Enregistrer le programme', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Sauvegarde locale active', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'MODIFICATION DEMO', exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept());

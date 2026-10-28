@@ -1,6 +1,14 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Copy, Plus, Save, Trash2 } from 'lucide-react';
-import { getState, putPayload, removeRecord, useData } from '../lib/store';
+import {
+  assertWorkspace,
+  flush,
+  getState,
+  getWorkspaceKey,
+  putPayload,
+  removeRecord,
+  useData,
+} from '../lib/store';
 import { uid } from '../lib/seed';
 import { DAYS, PHASES, type Block, type Program as ProgramType } from '../lib/types';
 import { loadLabel, resolveLoad } from '../lib/training';
@@ -35,6 +43,7 @@ export function Program() {
   const { toast } = useApp();
   const [draft, setDraft] = useState<ProgramType | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [openedVersion, setOpenedVersion] = useState<string | null>(null);
   const [newExerciseId, setNewExerciseId] = useState(exercises[0]?.id || '');
   const edit = (program: ProgramType) => {
@@ -141,8 +150,11 @@ export function Program() {
       {draft && (
         <Modal title="Éditer le programme" close={close}>
           <form
-            onSubmit={(event) => {
+            aria-busy={saving}
+            inert={saving}
+            onSubmit={async (event) => {
               event.preventDefault();
+              if (saving) return;
               if (!validatePayload('program', draft))
                 return toast('Vérifie les valeurs et ajoute au moins un exercice avec un bloc.');
               if (
@@ -153,9 +165,20 @@ export function Program() {
                 )
               )
                 return;
-              putPayload('program', draft);
-              setDraft(null);
-              toast('Programme enregistré. Tes anciennes séances restent intactes.');
+              const scope = getWorkspaceKey()!;
+              setSaving(true);
+              try {
+                putPayload('program', draft);
+                await flush();
+                assertWorkspace(scope);
+                setDraft((current) => (current?.id === draft.id ? null : current));
+                toast('Programme enregistré. Tes anciennes séances restent intactes.');
+              } catch {
+                if (getWorkspaceKey() === scope)
+                  toast('Sauvegarde locale incomplète. Réessaie avant de fermer.');
+              } finally {
+                if (getWorkspaceKey() === scope) setSaving(false);
+              }
             }}
           >
             <div className="form-row">
@@ -476,9 +499,9 @@ export function Program() {
               une assistance. Les pourcentages sont arrondis avec l’incrément de tes paramètres.
             </Note>
             <div className="modal-footer">
-              <Button type="submit" className="primary">
+              <Button type="submit" className="primary" disabled={saving}>
                 <Save size={17} />
-                Enregistrer le programme
+                {saving ? 'Enregistrement…' : 'Enregistrer le programme'}
               </Button>
               {programs.some((p) => p.id === draft.id) && (
                 <Button
