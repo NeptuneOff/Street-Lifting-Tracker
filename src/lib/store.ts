@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { seedRecords, uid } from './seed';
+import { seedDemoRecords } from './demo';
 import { workspaceKey, WorkspaceChangedError, type WorkspaceIdentity } from './workspace';
 import type {
   DataRecord,
@@ -127,7 +128,10 @@ export async function initialize(identity: WorkspaceIdentity) {
     }
     let records = await readFor(workspace);
     if (!records.length) {
-      records = (await ownedLegacy(identity)) ?? seedRecords({ name: identity.name, blank: true });
+      records =
+        identity.mode === 'demo'
+          ? seedDemoRecords()
+          : ((await ownedLegacy(identity)) ?? seedRecords({ name: identity.name, blank: true }));
       await writeFor(workspace, records);
     }
     if (active !== workspace) return;
@@ -243,4 +247,27 @@ export function useData() {
       .map((r) => r.payload as Weight)
       .sort((a, b) => a.date.localeCompare(b.date)),
   };
+}
+
+export async function resetDemoWorkspace() {
+  const workspace = current();
+  if (workspace.identity.mode !== 'demo') throw new Error('Réinitialisation réservée à la démo.');
+  await workspace.writes;
+  assertWorkspace(workspace.key);
+  const records = seedDemoRecords();
+  const db = await openFor(workspace);
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('records', 'readwrite');
+    const store = tx.objectStore('records');
+    store.clear();
+    records.forEach((r) => store.put(r));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+  assertWorkspace(workspace.key);
+  localStorage.removeItem(workspaceStorageKey('timer'));
+  localStorage.removeItem(workspaceStorageKey('last-sync'));
+  workspace.channel?.postMessage('changed');
+  emit({ records, error: '', saving: false });
 }

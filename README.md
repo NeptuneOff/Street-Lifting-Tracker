@@ -1,6 +1,6 @@
 # StreetLift Tracker
 
-Carnet personnel de street lifting, pensé pour cocher ses séries sur téléphone. React + TypeScript + Vite, IndexedDB pour les données, PWA pour le hors connexion, Supabase pour les comptes privés et la synchronisation entre appareils. La connexion est obligatoire avant tout accès au carnet.
+Carnet personnel de street lifting, pensé pour cocher ses séries sur téléphone. React + TypeScript + Vite, IndexedDB pour les données, PWA pour le hors connexion, Supabase pour les comptes privés et la synchronisation entre appareils. La connexion est obligatoire avant tout accès à un carnet personnel. Un espace de démonstration séparé permet de découvrir le suivi sans compte.
 
 **Application : https://neptuneoff.github.io/Street-Lifting-Tracker/**
 
@@ -36,6 +36,18 @@ Le service worker est actif uniquement dans le build de production (`preview` ou
 6. **Paramètres** : profil, références 1RM, bibliothèque d’exercices, pesées, sauvegardes et compte Supabase.
 
 Chaque nouveau compte reçoit une copie indépendante du programme de base, avec des références 1RM à renseigner (0 kg), 0 kg de lest et 20 kg pour les blocs de squat. Le poids du profil (75 kg) est une valeur à ajuster, pas une pesée enregistrée. **Aucune donnée personnelle ni performance d’un autre utilisateur n’est copiée.**
+
+### Essayer le compte de démonstration
+
+Cliquer sur **Essayer la démo** à l’accueil, ou ouvrir https://neptuneoff.github.io/Street-Lifting-Tracker/#demo. La démo fonctionne sans Supabase ni création de compte et s’ouvre directement sur la progression.
+
+Elle contient 12 semaines de suivi entièrement fictif : quatre journées d’entraînement par semaine, charges progressives, semaines techniques légères, bilans mensuels avec singles pour les quatre mouvements, pesées régulières, RIR et commentaires. Le nombre exact suit le calendrier ; au 28 octobre 2026, le jeu représente 50 séances et 38 pesées. Les dates sont relatives au jour de première ouverture ou de réinitialisation et ne créent aucune séance future.
+
+- Une bannière **MODE DÉMO · DONNÉES FICTIVES** reste visible sur chaque écran.
+- Le programme et les séances peuvent être modifiés pour essayer les interactions. Ces changements restent dans une base locale dédiée à la démo ; aucune donnée démo n’est envoyée à Supabase.
+- **Réinitialiser la démo** restaure les données fictives après confirmation, sans toucher aux carnets personnels.
+- **Quitter la démo** retourne à l’accueil ou au compte déjà connecté, sans déconnecter celui-ci.
+- Aucun identifiant partagé, mot de passe public ou compte réel n’est créé. Chaque navigateur dispose de sa propre copie, séparée des comptes privés.
 
 ### Programme initial : valeurs de départ
 
@@ -85,7 +97,7 @@ Le navigateur peut supprimer les données en navigation privée, après effaceme
 
 ## Activer les comptes privés avec Supabase
 
-**Sans configuration, l’application affiche un écran d’activation et ne charge aucun carnet.** Pour ouvrir la connexion et l’inscription à tous les visiteurs :
+**Sans configuration, aucun carnet personnel n’est accessible ; seule la démo fictive reste disponible.** Pour ouvrir la connexion et l’inscription à tous les visiteurs :
 
 1. Créer un projet Supabase et activer le fournisseur **Email** avec confirmation des adresses.
 2. Dans son SQL Editor, exécuter dans cet ordre [`001_training_records.sql`](supabase/migrations/001_training_records.sql) puis [`002_private_accounts.sql`](supabase/migrations/002_private_accounts.sql). Sur une installation existante ayant déjà exécuté 001, ajouter seulement 002.

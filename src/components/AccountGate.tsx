@@ -1,7 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Dumbbell, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
-import { clearWorkspace, flush, getWorkspaceKey, initialize } from '../lib/store';
+import {
+  clearWorkspace,
+  flush,
+  getWorkspaceKey,
+  initialize,
+  resetDemoWorkspace,
+} from '../lib/store';
 import {
   authStorageKey,
   legacyAuthStorageKey,
@@ -10,13 +16,14 @@ import {
   validateConfig,
 } from '../lib/sync';
 import { resetCloudStatus } from '../lib/cloud-status';
-import { workspaceKey, type WorkspaceIdentity } from '../lib/workspace';
+import { DEMO_IDENTITY, workspaceKey, type WorkspaceIdentity } from '../lib/workspace';
 import { Button } from './UI';
 import { usePWARegistration } from '../lib/pwa';
 
 interface Account {
   identity: WorkspaceIdentity;
   signOut: () => Promise<void>;
+  resetDemo: () => Promise<void>;
 }
 const AccountContext = createContext<Account | null>(null);
 export function useAccount() {
@@ -30,9 +37,14 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [message, setMessage] = useState('');
+  const [demoRevision, setDemoRevision] = useState(0);
   const attempt = useRef(0);
   const desired = useRef<string | null>(null);
   const signingOut = useRef(false);
+  const demoActive = useRef(
+    location.hash === '#demo' || sessionStorage.getItem('streetlift-demo') === '1',
+  );
+  const setupRef = useRef<() => void>(() => {});
   const applyRef = useRef<(session: Session | null) => void>(() => {});
   useEffect(() => {
     let unsubscribe = () => {};
@@ -45,6 +57,16 @@ export function AccountGate({ children }: { children: ReactNode }) {
       resetCloudStatus();
       setIdentity(null);
       setLoading(true);
+      if (demoActive.current) {
+        sessionStorage.setItem('streetlift-demo', '1');
+        const ticket = attempt.current;
+        void initialize(DEMO_IDENTITY).then(() => {
+          if (disposed || ticket !== attempt.current) return;
+          setIdentity(DEMO_IDENTITY);
+          setLoading(false);
+        });
+        return;
+      }
       try {
         const cloud = getCloudClient();
         setConfigured(!!cloud);
@@ -53,7 +75,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
           return;
         }
         const apply = (session: Session | null) => {
-          if (disposed || signingOut.current) return;
+          if (disposed || signingOut.current || demoActive.current) return;
           const next: WorkspaceIdentity | null = session
             ? {
                 project: new URL(getCloudConfig().url).origin,
@@ -108,6 +130,14 @@ export function AccountGate({ children }: { children: ReactNode }) {
         setMessage('La configuration de connexion doit être corrigée.');
       }
     };
+    setupRef.current = setup;
+    const hashChanged = () => {
+      if (location.hash === '#demo' && !demoActive.current) {
+        demoActive.current = true;
+        setup();
+      }
+    };
+    window.addEventListener('hashchange', hashChanged);
     setup();
     window.addEventListener('streetlift-cloud-config', setup);
     return () => {
@@ -116,9 +146,27 @@ export function AccountGate({ children }: { children: ReactNode }) {
       unsubscribe();
       clearWorkspace();
       window.removeEventListener('streetlift-cloud-config', setup);
+      window.removeEventListener('hashchange', hashChanged);
     };
   }, []);
+  const startDemo = () => {
+    demoActive.current = true;
+    sessionStorage.setItem('streetlift-demo', '1');
+    location.hash = 'demo';
+    setupRef.current();
+  };
+  const resetDemo = async () => {
+    if (identity?.mode !== 'demo') throw new Error('Action réservée à la démo.');
+    setLoading(true);
+    try {
+      await resetDemoWorkspace();
+      setDemoRevision((r) => r + 1);
+    } finally {
+      setLoading(false);
+    }
+  };
   const signOut = async () => {
+    const isDemo = identity?.mode === 'demo';
     signingOut.current = true;
     const pending = flush();
     attempt.current++;
@@ -131,6 +179,11 @@ export function AccountGate({ children }: { children: ReactNode }) {
       await pending;
     } catch {
       /* Unsaved changes stay in the owner's in-memory workspace. */
+    }
+    if (isDemo) {
+      sessionStorage.removeItem('streetlift-demo');
+      location.replace(new URL(import.meta.env.BASE_URL, location.origin).href);
+      return;
     }
     try {
       await getCloudClient()?.auth.signOut({ scope: 'local' });
@@ -152,12 +205,16 @@ export function AccountGate({ children }: { children: ReactNode }) {
     );
   if (identity && getWorkspaceKey() === workspaceKey(identity))
     return (
-      <AccountContext.Provider key={workspaceKey(identity)} value={{ identity, signOut }}>
+      <AccountContext.Provider
+        key={`${workspaceKey(identity)}:${demoRevision}`}
+        value={{ identity, signOut, resetDemo }}
+      >
         {children}
       </AccountContext.Provider>
     );
   return (
     <SignIn
+      onDemo={startDemo}
       configured={configured}
       initialMessage={message}
       onSession={(session) => applyRef.current(session)}
@@ -165,10 +222,12 @@ export function AccountGate({ children }: { children: ReactNode }) {
   );
 }
 function SignIn({
+  onDemo,
   configured,
   initialMessage,
   onSession,
 }: {
+  onDemo: () => void;
   configured: boolean;
   initialMessage: string;
   onSession: (session: Session | null) => void;
@@ -362,6 +421,13 @@ function SignIn({
             </details>
           </>
         )}
+        <div className="demo-entry">
+          <Button className="secondary wide" onClick={onDemo} disabled={busy}>
+            <Dumbbell size={17} />
+            Essayer la démo
+          </Button>
+          <p>12 semaines de suivi fictif, sans créer de compte.</p>
+        </div>
         {message && (
           <p className="account-message" role="status">
             {message}
@@ -369,7 +435,7 @@ function SignIn({
         )}
         <div className="account-privacy">
           <ShieldCheck size={15} />
-          <span>Aucun carnet accessible sans connexion.</span>
+          <span>Tes carnets personnels restent accessibles uniquement après connexion.</span>
         </div>
       </section>
     </div>

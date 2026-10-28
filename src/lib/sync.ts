@@ -113,6 +113,7 @@ export async function synchronize(): Promise<{
   signedOut?: boolean;
 }> {
   const scope = getWorkspaceKey();
+  if (getWorkspaceIdentity()?.mode === 'demo') return { conflicts: [], count: 0 };
   if (!scope || !getState().ready) return { conflicts: [], count: 0, signedOut: true };
   if (syncing.has(scope)) return { conflicts: [], count: 0 };
   const cloud = getCloudClient();

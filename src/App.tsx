@@ -35,6 +35,7 @@ const navigation = [
 ] as const;
 function pageFromHash(): Page {
   const hash = location.hash.slice(1);
+  if (hash === 'demo') return 'progress';
   return navigation.some((p) => p.id === hash)
     ? (hash as Page)
     : hash.includes('access_token')
@@ -42,7 +43,8 @@ function pageFromHash(): Page {
       : 'home';
 }
 export function App() {
-  const { identity } = useAccount();
+  const { identity, signOut, resetDemo } = useAccount();
+  const isDemo = identity.mode === 'demo';
   const data = useData();
   const cloud = useCloudStatus();
   const { ready: offlineReady, update } = usePWAStatus();
@@ -90,7 +92,7 @@ export function App() {
     };
   }, []);
   useEffect(() => {
-    if (!data.ready) return;
+    if (!data.ready || isDemo) return;
     let cleanup = () => {};
     const setup = () => {
       cleanup();
@@ -115,7 +117,7 @@ export function App() {
       clearInterval(interval);
       window.removeEventListener('streetlift-cloud-config', setup);
     };
-  }, [data.ready]);
+  }, [data.ready, isDemo]);
   const dirtyVersions = data.records
     .filter((r) => r.dirty)
     .map((r) => r.version)
@@ -270,6 +272,34 @@ export function App() {
               )}
             </div>
           </header>
+          {isDemo && (
+            <aside className="demo-banner" aria-label="Mode démonstration">
+              <div>
+                <strong>MODE DÉMO · DONNÉES FICTIVES</strong>
+                <span>
+                  {data.sessions.filter((s) => s.status === 'completed').length} séances ·{' '}
+                  {data.weights.length} pesées · espace indépendant, sans synchronisation
+                </span>
+              </div>
+              <div className="demo-banner-actions">
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        'Réinitialiser les données fictives et annuler tes modifications dans la démo ?',
+                      )
+                    )
+                      void resetDemo().catch(() =>
+                        window.alert('Réinitialisation impossible. Réessaie.'),
+                      );
+                  }}
+                >
+                  Réinitialiser la démo
+                </button>
+                <button onClick={() => void signOut()}>Quitter la démo</button>
+              </div>
+            </aside>
+          )}
           {update && (
             <div className="update-banner">
               <span>Une nouvelle version est disponible.</span>

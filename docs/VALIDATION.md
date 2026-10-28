@@ -21,6 +21,12 @@ Les parcours Auth utilisent un serveur simulé : écran fermé sans connexion, i
 
 Les parcours s’exécutent sur `npm run build` + `preview`, pas sur le serveur de développement, pour tester réellement le précache PWA.
 
+## Démonstration
+
+Les tests de génération vérifient les dates, l’unicité des identifiants, l’aller-retour JSON, les données présentes pour les quatre graphiques et les trois bilans de singles. Les tests de stockage vérifient que la réinitialisation n’affecte pas un compte privé et qu’aucune synchronisation n’est possible depuis la démo.
+
+Les parcours navigateur (mobile et desktop) couvrent l’entrée sans Supabase, l’historique détaillé, la modification puis la réinitialisation, le rechargement hors ligne et la sortie vers un compte connecté préservé. Le test observe les requêtes pour vérifier l’absence d’envoi au backend durant la démo.
+
 ## Recette Supabase à réaliser après configuration d’un projet
 
 1. Exécuter les migrations 001 et 002 et confirmer RLS activé dans Supabase.

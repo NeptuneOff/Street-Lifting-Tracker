@@ -61,7 +61,7 @@ export function Chart({
               y={y(low + (high - low) * t) + 4}
               textAnchor="end"
               fill="#8b948a"
-              fontSize="11"
+              fontSize="18"
             >
               {number(low + (high - low) * t)}
             </text>
@@ -77,7 +77,7 @@ export function Chart({
               stroke="#edac72"
               strokeDasharray="7 5"
             />
-            <text x="590" y={y(limit) - 7} fill="#edac72" textAnchor="end" fontSize="11">
+            <text x="590" y={y(limit) - 7} fill="#edac72" textAnchor="end" fontSize="18">
               Catégorie {number(limit)} {unit}
             </text>
           </g>
@@ -115,12 +115,12 @@ export function Chart({
           y="190"
           textAnchor={first === last ? 'middle' : 'start'}
           fill="#8b948a"
-          fontSize="11"
+          fontSize="18"
         >
           {new Date(first).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
         </text>
         {first !== last && (
-          <text x="590" y="190" textAnchor="end" fill="#8b948a" fontSize="11">
+          <text x="590" y="190" textAnchor="end" fill="#8b948a" fontSize="18">
             {new Date(last).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
           </text>
         )}

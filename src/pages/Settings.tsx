@@ -473,6 +473,24 @@ function CloudSettings() {
   const { toast } = useApp();
   const status = useCloudStatus();
   const { identity, signOut } = useAccount();
+  if (identity.mode === 'demo')
+    return (
+      <section className="card settings-card">
+        <div className="section-head">
+          <h2>Compte de démonstration</h2>
+          <span className="tag">DONNÉES FICTIVES</span>
+        </div>
+        <p className="small muted">
+          Tu peux essayer les séances, modifier le programme et explorer les graphiques. Les
+          changements restent dans cet espace démo sur cet appareil, sans envoi vers un compte
+          personnel.
+        </p>
+        <Button className="secondary" onClick={() => void signOut()}>
+          <LogOut size={16} />
+          Quitter la démo
+        </Button>
+      </section>
+    );
   const scope = getWorkspaceKey()!;
   return (
     <section className="card settings-card">
